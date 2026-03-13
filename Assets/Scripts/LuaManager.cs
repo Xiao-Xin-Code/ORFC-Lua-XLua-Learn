@@ -128,6 +128,7 @@ public class LuaManager : AutoMonoSingleton<LuaManager>
 		role_pool.RecycleAll();
 		role_group_pool.RecycleAll();
 
+		LuaTable tags = luaEnv.Global.Get<LuaTable>("tags");
 		LuaTable roles = luaEnv.Global.Get<LuaTable>("roles");
 		object[] result = ExecuteLuaFunction("search_role_with_tag", ConverToTable(tagCombines));
 		LuaTable table = result[0] as LuaTable;
@@ -141,17 +142,17 @@ public class LuaManager : AutoMonoSingleton<LuaManager>
 			//遍历每组数据中的tag信息与role信息 {a},{b}
 			table.ForEach<object, object>((m, n) =>
 			{
-				string result = "";
+				string result = "|";
 				LuaTable table = n as LuaTable;
-				table.ForEach<int, object>((i, j) =>
+				table.ForEach<int, int>((i, j) =>
 				{
 					if (index == 1)
 					{
-						result += j;
+						result += tags.Get<int, LuaTable>(j).Get<string>("name") + "|";
 					}
 					else
 					{
-						int id = (int)(Int64)j;
+						int id = j;
 						result += j;
 						LuaTable roleInfo = roles.Get<int, LuaTable>(id);
 						RoleUnit role = role_pool.Get();
@@ -173,8 +174,10 @@ public class LuaManager : AutoMonoSingleton<LuaManager>
 
 	public Color GetTagColor(int tagid, string color)
 	{
-		LuaTable roles = luaEnv.Global.Get<LuaTable>("tagcolors");
-		LuaTable colors = roles.Get<int, LuaTable>(tagid);
+		LuaTable tags = luaEnv.Global.Get<LuaTable>("tags");
+		LuaTable tagcolors = luaEnv.Global.Get<LuaTable>("tagcolors");
+		int weight = tags.Get<int, LuaTable>(tagid).Get<int>("weight");
+        LuaTable colors = tagcolors.Get<int, LuaTable>(weight);
 		LuaTable colorTable = colors.Get<LuaTable>(color);
 		return new Color(colorTable.Get<float>("r"), colorTable.Get<float>("g"), colorTable.Get<float>("b"), colorTable.Get<float>("a"));
 	}
