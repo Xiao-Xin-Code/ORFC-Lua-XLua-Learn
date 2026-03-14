@@ -148,70 +148,54 @@ public class InfiniteScrollView : MonoBehaviour
 	{
 		BeforeUpdate?.Invoke();
 
-		//整体宽度 rectTransform.rect.width;
-		//整体高度 rectTransform.rect.height;
 
-		float totalH = 0;
-		float totalW = 0;
-
-		float curMaxHeight = 0;
-
-		float curX = 0;
-
-		//当前的位置
-		//是否需要添加左侧间隔
-		//是否添加右侧间隔
-		//死否添加中间间隔
-
-		bool isLeft = true;
+		float scrollrect = rectTransform.rect.width;
 
 
-		for (int i = 0; i < datas.Count; i++)
+		float currentX = 10;
+		float currentY = -10;
+
+
+		float rowMaxHeight = 0;
+
+
+		for(int i = 0; i < datas.Count; i++)
 		{
 
-			if (isLeft)
-			{
-				float tempx = curX + 10;
+			IItem item = Get();
 
-				if (tempx >= rectTransform.rect.width)
-				{
-					//无法在范围内显示 
-					return;
-				}
-				else
-				{
-					//可以进行添加一个时的判断
-				}
-				
-				curX += 10;
-
-				
-
-
-			}
-
-
-			if (i == 0)
-			{
-				totalH += 10;
-			}
-			IItem item = Get.Invoke();
-			item.RectTransform.SetParent(scroll.content);
-			item.UpdateItem(datas[i]);
+			float itemWidth = item.RectTransform.rect.width;
 			float itemHeight = item.RectTransform.rect.height;
-			float tempY = totalH + itemHeight / 2;
-			item.RectTransform.anchoredPosition = new Vector2(0, tempY);
-			totalH += itemHeight;
-			if (i < datas.Count - 1)
+
+			//当大于可显示范围
+			if(currentX + itemWidth > scrollrect)
 			{
-				totalH += 10;
+
+
+				//需要换行
+
+
+				currentX = 10;
+
+
 			}
-			if (i == datas.Count - 1)
-			{
-				totalH += 10;
-			}
+
+			rowMaxHeight = Mathf.Max(rowMaxHeight, itemHeight);
+
+			float positionX = currentX;
+			float positionY = currentY;
+
+
+			item.RectTransform.anchoredPosition = new Vector2(positionX, positionY);
+
+
 		}
-		scroll.content.sizeDelta = new Vector2(totalW, totalH);
+
+
+
+
+
+
 		EndUpdate?.Invoke();
 	}
 }
