@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -9,40 +8,59 @@ public class LuaManager : AutoMonoSingleton<LuaManager>
 	public Transform tagGroupParent;
 	public Transform roleGroupParent;
 
+	#region 预制件
+
 	TagUnit tagprefab;
 	RoleUnit rolePrefab;
+	TagElement tagElementPrefab;
 	TagClassification tagGroupPrefab;
 	RoleClassification roleGroupPrefab;
 
-    private MonoPool<TagUnit> tag_pool;
-    private MonoPool<RoleUnit> role_pool;
-	private MonoPool<TagClassification> tag_group_pool;
-    private MonoPool<RoleClassification> role_group_pool;
+
+	public TagUnit TagPrefab => tagprefab;
+	public RoleUnit RolePrefab => rolePrefab;
+	public TagElement TagElementPrefab => tagElementPrefab;
+	public TagClassification TagGroupPrefab => tagGroupPrefab;
+	public RoleClassification RoleGroupPrefab => roleGroupPrefab;
+
+
+	#endregion
+
+	#region Pool
+
+	MonoPool<TagClassification> tag_group_pool;
+	MonoPool<RoleClassification> role_group_pool;
+
+	#endregion
+
+
+	Transform pool_root;
+	
+
+
+
 
 	private LuaEnv luaEnv;
     public List<int> tagCombines = new List<int>();
 
     void Start()
     {
-		Transform pool_root = new GameObject("Pools").transform;
-		Transform pool_tag_unit = new GameObject("Tags").transform;
-		Transform pool_role_unit = new GameObject("Roles").transform;
+		pool_root = new GameObject("Pools").transform;
 		Transform pool_tag_group = new GameObject("TagGroup").transform;
 		Transform pool_role_group = new GameObject("RoleGroup").transform;
-		pool_tag_unit.SetParent(pool_root);
-		pool_role_unit.SetParent(pool_root);
+
 		pool_tag_group.SetParent(pool_root);
 		pool_role_group.SetParent(pool_root);
 
-		tagprefab = Resources.Load<TagUnit>("TagUnit");
-		rolePrefab = Resources.Load<RoleUnit>("RoleUnit");
-		tagGroupPrefab = Resources.Load<TagClassification>("Tag_Group");
-		roleGroupPrefab = Resources.Load<RoleClassification>("Role_Group");
+		tagprefab = Resources.Load<TagUnit>("tag_unit");
+		rolePrefab = Resources.Load<RoleUnit>("role_unit");
+		tagElementPrefab = Resources.Load<TagElement>("tag_element");
+		tagGroupPrefab = Resources.Load<TagClassification>("tag_group");
+		roleGroupPrefab = Resources.Load<RoleClassification>("role_group");
 
-		tag_pool = new MonoPool<TagUnit>(tagprefab, pool_tag_unit);
-		role_pool = new MonoPool<RoleUnit>(rolePrefab, pool_role_unit);
 		tag_group_pool = new MonoPool<TagClassification>(tagGroupPrefab, pool_tag_group);
 		role_group_pool = new MonoPool<RoleClassification>(roleGroupPrefab, pool_role_group);
+		
 
 		luaEnv = new LuaEnv();
 
@@ -93,31 +111,32 @@ public class LuaManager : AutoMonoSingleton<LuaManager>
     }
 
 
+
+	public bool IsSelect(int tag_id)
+	{
+		return tagCombines.Contains(tag_id);
+	}
+
+
 	private void SetTagGroup()
 	{
-		tag_pool.RecycleAll();
 		tag_group_pool.RecycleAll();
 
 		LuaTable tags = luaEnv.Global.Get<LuaTable>("tags");
 		LuaTable tagsgroup = luaEnv.Global.Get<LuaTable>("tagsgroup");
-		//Debug.Log(tagsgroup == null);
+
 		tagsgroup.ForEach<int, LuaTable>((index, taggroup) =>
 		{
 			string grouname = taggroup.Get<string>("name");
 			LuaTable tagids = taggroup.Get<LuaTable>("tags");
+
 			//创建TagGroup
 			TagClassification tagClassification = tag_group_pool.Get();
 			tagClassification.SetName(grouname);
 			tagClassification.transform.SetParent(tagGroupParent);
-			tagids.ForEach<int, int>((i, id) =>
-			{
-				LuaTable tagInfo = tags.Get<int, LuaTable>(id);
-				TagUnit unit = tag_pool.Get();
-				unit.SetName(tagInfo.Get<string>("name"));
-				unit.SetID(id);
-				unit.SetIsOn(false);
-				tagClassification.SetTagLocation(unit.transform);
-			});
+
+			tagClassification.Init();
+			tagClassification.Scroll.SetDatas(tagids.Cast<List<int>>());
 		});
 
 		LayoutRebuilder.ForceRebuildLayoutImmediate(tagGroupParent.GetComponent<RectTransform>());
@@ -125,46 +144,33 @@ public class LuaManager : AutoMonoSingleton<LuaManager>
 
     public void Search_Roles()
     {
-		role_pool.RecycleAll();
 		role_group_pool.RecycleAll();
 
 		LuaTable tags = luaEnv.Global.Get<LuaTable>("tags");
 		LuaTable roles = luaEnv.Global.Get<LuaTable>("roles");
 		object[] result = ExecuteLuaFunction("search_role_with_tag", ConverToTable(tagCombines));
 		LuaTable table = result[0] as LuaTable;
+
 		//遍历所有返回数据{ { { a},{ b} } }->{ { a},{ b} }
-		table.ForEach<object, object>((k, v) =>
+		table.ForEach<object, LuaTable>((k, v) =>
 		{
 			RoleClassification roleClassification = role_group_pool.Get();
 			roleClassification.transform.SetParent(roleGroupParent);
-			LuaTable table = v as LuaTable;
+			roleClassification.Init();
+
 			int index = 1;
+
 			//遍历每组数据中的tag信息与role信息 {a},{b}
-			table.ForEach<object, object>((m, n) =>
+			v.ForEach<object, LuaTable>((m, n) =>
 			{
-				string result = "|";
-				LuaTable table = n as LuaTable;
-				table.ForEach<int, int>((i, j) =>
+				if(index == 1)
 				{
-					if (index == 1)
-					{
-						result += tags.Get<int, LuaTable>(j).Get<string>("name") + "|";
-					}
-					else
-					{
-						int id = j;
-						result += j;
-						LuaTable roleInfo = roles.Get<int, LuaTable>(id);
-						RoleUnit role = role_pool.Get();
-						role.SetID(id);
-						role.SetName(roleInfo.Get<string>("name"));
-						roleClassification.SetRoleLocation(role.transform);
-					}
-				});
-
-				if (index == 1) roleClassification.SetName(result);
-
-				//Debug.Log(result);
+					roleClassification.Tag_Scroll.SetDatas(n.Cast<List<int>>());
+				}
+				else
+				{
+					roleClassification.Role_Scroll.SetDatas(n.Cast<List<int>>());
+				}
 				index++;
 			});
 		});
@@ -181,6 +187,22 @@ public class LuaManager : AutoMonoSingleton<LuaManager>
 		LuaTable colorTable = colors.Get<LuaTable>(color);
 		return new Color(colorTable.Get<float>("r"), colorTable.Get<float>("g"), colorTable.Get<float>("b"), colorTable.Get<float>("a"));
 	}
+
+
+	public LuaTable GetTagInfo(int tagid)
+	{
+		LuaTable tags = luaEnv.Global.Get<LuaTable>("tags");
+		LuaTable taginfo = tags.Get<int, LuaTable>(tagid);
+		return taginfo;
+	}
+
+	public LuaTable GetRoleInfo(int roleid)
+	{
+		LuaTable roles = luaEnv.Global.Get<LuaTable>("roles");
+		LuaTable roleinfo = roles.Get<int, LuaTable>(roleid);
+		return roleinfo;
+	}
+
 
 	private LuaTable ConverToTable<T>(IEnumerable<T> values)
     {
@@ -208,4 +230,21 @@ public class LuaManager : AutoMonoSingleton<LuaManager>
 		}
         return null;
 	}
+
+
+
+	private void UpdateTagParentSize()
+	{
+
+		 
+
+	}
+
+	private void UpdateRoleParnetSize()
+	{
+
+	}
+
+
+
 }

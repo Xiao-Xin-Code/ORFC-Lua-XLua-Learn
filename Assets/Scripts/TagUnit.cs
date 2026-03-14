@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-public class TagUnit : MonoBehaviour,
+public class TagUnit : MonoBehaviour,IItem,
     IPointerDownHandler,IPointerUpHandler
 {
     [SerializeField]
@@ -11,12 +11,15 @@ public class TagUnit : MonoBehaviour,
     [SerializeField]
     Image image;
 
+    [SerializeField] RectTransform rectTransform;
+
     public bool isOn;
 
     public int ID { get; private set; }
 
+	public RectTransform RectTransform => rectTransform;
 
-    public void SetIsOn(bool state)
+	public void SetIsOn(bool state)
     {
         string colorState = state ? "select_color" : "default_color";
         string infoColorState = state ? "select_info_color" : "default_info_color";
@@ -24,7 +27,6 @@ public class TagUnit : MonoBehaviour,
         image.color = LuaManager.Instance.GetTagColor(ID, colorState);
         name_text.color = LuaManager.Instance.GetTagColor(ID, infoColorState);
 	}
-
 
 	public void OnPointerDown(PointerEventData eventData)
 	{
@@ -65,9 +67,26 @@ public class TagUnit : MonoBehaviour,
         ID = id;
     }
 
-
     public void SetName(string name)
     {
         name_text.text = name;
+    }
+
+	public void UpdateItem(params object[] data)
+	{
+        if (data != null && data.Length > 0)
+        {
+            try
+            {
+                int id = (int)data[0];
+                ID = id;
+                SetName(LuaManager.Instance.GetTagInfo(id).Get<string>("name"));
+				SetIsOn(LuaManager.Instance.IsSelect(id));
+			}
+            catch
+            {
+
+            }
+        }
     }
 }
